@@ -46,6 +46,7 @@ from config import (
     PROVIDER_LOCAL_LLAMA,
     PROVIDER_LOCAL_LLM,
     PROVIDER_OPENAI,
+    PROVIDER_OPENROUTER,
     PROVIDER_SPEC,
     TRANSCRIPTION_PROVIDERS,
 )
@@ -847,6 +848,11 @@ class SettingsDialog(QDialog):
         self._local_llm_model.setPlaceholderText("llama3.2")
         form.addRow("Custom LLM model", self._local_llm_model)
 
+        self._openrouter_model = QLineEdit(config.get("openrouter_model", ""))
+        self._openrouter_model.setPlaceholderText("openai/gpt-4o-mini")
+        self._openrouter_model.setToolTip("Model slug from openrouter.ai/models")
+        form.addRow("OpenRouter model", self._openrouter_model)
+
         self._llama_model = ModelPicker(
             llamacpp, config.get("llama_model", ""), parent=self
         )
@@ -878,6 +884,11 @@ class SettingsDialog(QDialog):
         self._groq_key.setEchoMode(QLineEdit.EchoMode.Password)
         self._groq_key.setPlaceholderText("gsk_…  (free from console.groq.com)")
         form.addRow("Groq API key", self._groq_key)
+
+        self._openrouter_key = QLineEdit(config.api_key_for(PROVIDER_OPENROUTER))
+        self._openrouter_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self._openrouter_key.setPlaceholderText("sk-or-…")
+        form.addRow("OpenRouter API key", self._openrouter_key)
 
         # --- Audio ---
         add_section("Audio")
@@ -1042,6 +1053,9 @@ class SettingsDialog(QDialog):
             self._llama_model,
             self._ai_provider.currentData() == PROVIDER_LOCAL_LLAMA,
         )
+        openrouter = PROVIDER_OPENROUTER in selected
+        self._form.setRowVisible(self._openrouter_model, openrouter)
+        self._form.setRowVisible(self._openrouter_key, openrouter)
         # llama.cpp is started and checked by FlowClone itself.
         self._form.setRowVisible(
             self._api_test,
@@ -1050,7 +1064,7 @@ class SettingsDialog(QDialog):
         self._api_test_status.setText("")
         self._form.setRowVisible(self._openai_key, PROVIDER_OPENAI in selected)
         self._form.setRowVisible(self._groq_key, PROVIDER_GROQ in selected)
-        needs_key = bool({PROVIDER_OPENAI, PROVIDER_GROQ} & selected)
+        needs_key = bool({PROVIDER_OPENAI, PROVIDER_GROQ, PROVIDER_OPENROUTER} & selected)
         for widget in self._api_keys_section:
             self._form.setRowVisible(widget, needs_key)
         if self.isVisible():
@@ -1068,8 +1082,16 @@ class SettingsDialog(QDialog):
         else:
             spec = PROVIDER_SPEC[provider]
             base_url, model = spec["base_url"], spec["chat_model"]
-            key_edit = self._groq_key if provider == PROVIDER_GROQ else self._openai_key
+            key_edit = {
+                PROVIDER_GROQ: self._groq_key,
+                PROVIDER_OPENROUTER: self._openrouter_key,
+            }.get(provider, self._openai_key)
             api_key = key_edit.text().strip()
+            if provider == PROVIDER_OPENROUTER:
+                model = self._openrouter_model.text().strip()
+                if not model:
+                    self._on_api_test_finished("Set the OpenRouter model.")
+                    return
             if not api_key:
                 self._on_api_test_finished(f"No API key for {spec['display']}.")
                 return
@@ -1131,6 +1153,8 @@ class SettingsDialog(QDialog):
         local_llm_model = self._local_llm_model.text().strip()
         openai_key = self._openai_key.text().strip()
         groq_key = self._groq_key.text().strip()
+        openrouter_key = self._openrouter_key.text().strip()
+        openrouter_model = self._openrouter_model.text().strip()
         language = self._language.currentData() or "en"
         input_device = self._mic.currentData() or ""
         whisper_model = self._whisper_model.value() or "base"
@@ -1149,10 +1173,13 @@ class SettingsDialog(QDialog):
                 config.set_api_key_for(PROVIDER_OPENAI, openai_key)
             if groq_key:
                 config.set_api_key_for(PROVIDER_GROQ, groq_key)
+            if openrouter_key:
+                config.set_api_key_for(PROVIDER_OPENROUTER, openrouter_key)
             config.set("provider", provider)
             config.set("ai_provider", ai_provider)
             config.set("local_llm_url", local_llm_url)
             config.set("local_llm_model", local_llm_model)
+            config.set("openrouter_model", openrouter_model)
             config.set("language", language)
             config.set("input_device", input_device)
             config.set("whisper_model", whisper_model)

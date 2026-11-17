@@ -79,11 +79,13 @@ PROVIDER_GROQ = "groq"
 PROVIDER_LOCAL = "local"
 PROVIDER_LOCAL_LLM = "local_llm"
 PROVIDER_LOCAL_LLAMA = "local_llama"
+PROVIDER_OPENROUTER = "openrouter"
 
 TRANSCRIPTION_PROVIDERS = (PROVIDER_OPENAI, PROVIDER_GROQ, PROVIDER_LOCAL)
 AI_PROVIDERS = (
     PROVIDER_OPENAI,
     PROVIDER_GROQ,
+    PROVIDER_OPENROUTER,
     PROVIDER_LOCAL_LLAMA,
     PROVIDER_LOCAL_LLM,
 )
@@ -106,6 +108,7 @@ DEFAULTS = {
     "local_llm_url": "http://localhost:11434/v1",
     "local_llm_model": "llama3.2",
     "llama_model": "smollm2-1.7b-instruct-q4_k_m",  # see llamacpp.MODELS
+    "openrouter_model": "openai/gpt-4o-mini",  # any slug from openrouter.ai/models
     "color_scheme": "system",  # "system", "dark" or "light"
     "developer_mode": False,
 }
@@ -125,6 +128,14 @@ PROVIDER_SPEC = {
         "whisper_model": "whisper-large-v3-turbo",
         "chat_model": "llama-3.3-70b-versatile",
         "display": "Groq (free)",
+    },
+    # AI processing only; model comes from the "openrouter_model" setting.
+    PROVIDER_OPENROUTER: {
+        "env_key": "OPENROUTER_API_KEY",
+        "base_url": "https://openrouter.ai/api/v1",
+        "whisper_model": None,
+        "chat_model": None,
+        "display": "OpenRouter",
     },
     # Offline transcription via bin/whisper-server; model comes from the
     # "whisper_model" setting. Transcription only.
@@ -249,6 +260,8 @@ class Config:
             return str(self.get("local_llm_model", "")).strip()
         if self.ai_provider == PROVIDER_LOCAL_LLAMA:
             return str(self.get("llama_model", ""))
+        if self.ai_provider == PROVIDER_OPENROUTER:
+            return str(self.get("openrouter_model", "")).strip()
         return PROVIDER_SPEC[self.ai_provider]["chat_model"]
 
     @property
