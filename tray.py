@@ -109,12 +109,14 @@ class Tray:
         on_quit: Callable[[], None],
         on_relaunch_admin: Callable[[], None] | None = None,
         on_restart: Callable[[], None] | None = None,
+        on_copy_last_result: Callable[[], None] | None = None,
     ):
         self._on_open_settings = on_open_settings
         self._on_toggle_ai_cleanup = on_toggle_ai_cleanup
         self._on_quit = on_quit
         self._on_relaunch_admin = on_relaunch_admin or elevation.relaunch_as_admin
         self._on_restart = on_restart
+        self._on_copy_last_result = on_copy_last_result
         self._icon: pystray.Icon | None = None
         self._thread: threading.Thread | None = None
 
@@ -130,6 +132,9 @@ class Tray:
 
         def open_settings(_icon, _item):
             self._on_open_settings()
+
+        def copy_last_result(_icon, _item):
+            self._on_copy_last_result()
 
         def quit_app(_icon, _item):
             self._on_quit()
@@ -158,6 +163,10 @@ class Tray:
             pystray.MenuItem("Settings", open_settings, default=True),
             pystray.MenuItem("Toggle AI Cleanup", toggle_ai, checked=ai_enabled),
         ]
+        if self._on_copy_last_result:
+            items.append(
+                pystray.MenuItem("Copy last result to clipboard", copy_last_result)
+            )
         if not is_admin:
             # Only show when non-admin — the option to re-elevate is only
             # meaningful when we currently can't inject into elevated targets.
@@ -220,11 +229,13 @@ class _QtTray:
         on_quit: Callable[[], None],
         on_relaunch_admin: Callable[[], None] | None = None,
         on_restart: Callable[[], None] | None = None,
+        on_copy_last_result: Callable[[], None] | None = None,
     ):
         self._on_open_settings = on_open_settings
         self._on_toggle_ai_cleanup = on_toggle_ai_cleanup
         self._on_quit = on_quit
         self._on_restart = on_restart
+        self._on_copy_last_result = on_copy_last_result
         self._icon = None
         self._menu = None
         self._ai_action = None
@@ -255,6 +266,10 @@ class _QtTray:
         self._ai_action = self._menu.addAction("Toggle AI Cleanup")
         self._ai_action.setCheckable(True)
         self._ai_action.toggled.connect(self._toggle_ai)
+        if self._on_copy_last_result:
+            self._menu.addAction("Copy last result to clipboard").triggered.connect(
+                lambda _checked=False: self._on_copy_last_result()
+            )
         self._menu.addSeparator()
         if self._on_restart:
             self._restart_action = self._menu.addAction("Restart")

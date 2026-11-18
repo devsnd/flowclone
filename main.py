@@ -10,6 +10,7 @@ import sys
 import threading
 import traceback
 
+import pyperclip
 from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import QApplication
@@ -82,6 +83,7 @@ class App(QObject):
             on_toggle_ai_cleanup=lambda _new: self._check_ai_service(),
             on_quit=self._quit,
             on_restart=self._restart,
+            on_copy_last_result=self._copy_last_result,
         )
 
         self._settings_dialog: SettingsDialog | None = None
@@ -216,6 +218,24 @@ class App(QObject):
         """Developer mode: quit, then main() starts a fresh process."""
         self.restart_requested = True
         self._quit()
+
+    def _copy_last_result(self):
+        """Tray: copy the newest logged result (AI output, else transcription)."""
+        threading.Thread(target=self._copy_last_result_worker, daemon=True).start()
+
+    def _copy_last_result_worker(self):
+        entries = transcript_log.load_entries()
+        if not entries:
+            self.overlay.show_error_signal.emit("No result yet")
+            return
+        last = entries[0]
+        text = (
+            last.ai_processed if last.ai_processed is not None else last.transcription
+        )
+        try:
+            pyperclip.copy(text)
+        except Exception as e:
+            self.overlay.show_error_signal.emit(f"Copy failed: {e}")
 
     # --- Push-to-talk pipeline ------------------------------------------
 
